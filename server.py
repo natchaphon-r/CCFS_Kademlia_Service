@@ -32,7 +32,25 @@ def start(getter,poster):
 	global post;
 	get = getter; post = poster;
 	#app.debug = True
-	app.run(host= '0.0.0.0',port =5001,debug = True);
+	#app.run(host= '0.0.0.0',port =5001,debug = False);
+	#cprint("between app.run and reactor.run")
+
+	# BEGIN run in under twisted through wsgi
+	from twisted.web.wsgi import WSGIResource
+	from twisted.web.server import Site
+
+	app.debug = True;
+	resource = WSGIResource(reactor, reactor.getThreadPool(), app)
+	site = Site(resource)
+	reactor.listenTCP(5000, site)
+	#cprint("after reactor.listenTCP")
+	reactor.run()
+	# END run in under twisted through wsgi
+
+
+
+
+	reactor.run();
 
 def cprint(string):
 	OKGREEN = '\033[92m'
@@ -63,11 +81,16 @@ def makeKey(user_data):
 		cprint("Invalid Type");	
 	return key
 
-def checkValid():
-	user_data = web.input();
-
-	cprint(web.data());
-	if (str(user_data["type"]) ==  "blob") and ((hashlib.sha256(str(web.data())).hexdigest() == str(user_data["hcid"]))):
+def checkValid(values,data):
+	#user_data = web.input();
+	trueblob = (str(values["type"]) ==  "blob") and ((hashlib.sha256(str(data)).hexdigest() == str(values["hcid"])));
+	truecommit = (str(values["type"]) ==  "commit") and (len(values) == 256/4);
+	truetag = (str(values["type"]) ==  "tag") and (len(values["hkid"]) == 256/4) and (len(values["namesegment"]) > 0);
+	truekey = (str(values["type"]) ==  "key") and (len(values["hkid"]) == 256/4);
+	
+	#cprint(web.data());
+	
+	if (trueblob or truecommit or truetag or truekey):
 		return True;
 	else:
 		return False;
@@ -77,27 +100,32 @@ app = Flask(__name__)
 @app.route('/',methods=['GET', 'POST'])
 def getorpost():
 	global global_result;
-	cprint("WE ARE HERE!")
+	#cprint("WE ARE HERE!")
 
 	event = threading.Event()
 	cprint(str(request.method))
 	#help(event)
 	#event = None
 	if request.method == 'POST':
-		key = makeKey(request.values[0]);
-		data = web.data(); # validate data with hashes
-		return checkValid()
+		#ls(request)
+		cprint("[POST Method] in here")
+		cprint("[POST Method] request.value[0] is %s" % str(request.values))
+		key = makeKey(request.values);
+		cprint("[POST Method] : key = %s" % str(key));
+		data = request.data; # validate data with hashes
+		cprint("[POST Method] : data = %s" % str(data));
+		#return checkValid(data)
 
-		if checkValid():
-			post(key,data,event);
-			return key
+		if checkValid(request.values,request.data):
+			post(key,data);
+			return "key is valid:\n %s" % key
 		else: 
-			print "Invalid Input";
+			return "Invalid Input: \n %s" % key;
 	elif request.method == 'GET':
 		#global global_result
 		global_result = None;
 		key = makeKey(request.values);
-		cprint("PASS MAKEKEY %s" % str(key))
+		#cprint("PASS MAKEKEY %s" % str(key))
 		#help(reactor)
 		thread_object = threading.Thread(group=None, target = get, name=None, args=(key,event), kwargs={})
 		thread_object.start()
@@ -108,18 +136,23 @@ def getorpost():
 		#print "printing from server %s" % data.callback()
 		#f()
 		#help(event)
-		cprint("got to wait")
-		cprint("The value of event.wait is " + str(event.isSet()))
+		#cprint("got to wait")
+		#cprint("The value of event.wait is " + str(event.isSet()))
 		#event.set()
 		if event.wait():
-			cprint("Result returned")
+			#cprint("Result returned")
 			cprint("global result = %s" % global_result)	
-			return str(global_result);	
+			cprint(str(type(global_result)))
+			if (len(global_result) > 0):
+				return global_result[0];
+			else:
+				return(str(global_result));	
 		else:
 			cprint("Fail... Time out")
-		cprint("got through wait")
+		#cprint("got through wait")
 
-		return "got to the end of get"
+		return "Time-out occured"
+
 if __name__ == "__main__":
 	app.debug = True
 	app.run();
