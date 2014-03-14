@@ -7,7 +7,7 @@ create_network.py 10 127.0.0.1
 python testnode1.py
 python testnode2.py
 '''
-from flask import g, app
+from flask import g, app,Flask
 from subprocess import call
 import entangled.node
 import time
@@ -55,30 +55,44 @@ class NODE:
 	event = None;
 	UDP = 4050; 
 	DATA = None; 
-	PEER = [("127.0.0.1",4060),("127.0.0.1",4001),("127.0.0.1",4002)];
+	PEER = [("localhost",4060),("localhost",4001),("localhost",4002)];
 	kademlia_node = None;
 	def __init__(self):
 		pass;
 	def registerNode(self):
-
+		#cprint("CALLLLLLLLLLLLLLLLLLLLLLLLL")
 		self.kademlia_node = entangled.node.EntangledNode(udpPort=self.UDP, dataStore=self.DATA)
-		commands = [];
-		commands.append((self.kademlia_node.joinNetwork,[self.PEER],{}));
-		commands.append((self.publishKey,[self.kademlia_node],{}));
-		commands.append((self.searchKey,[self.kademlia_node],{}));
-		threads.callMultipleInThread(commands);
+		# commands = [];
+		#cprint("")
+		# commands.append((self.kademlia_node.joinNetwork,[self.PEER],{}));
+		# commands.append((cprint,["echo commands echo"],{}));
+		# commands.append((self.publishKey,[self.kademlia_node],{}));
+		# commands.append((self.searchKey,[self.kademlia_node],{}));
+
+		self.kademlia_node.joinNetwork(self.PEER)
+		#call(["echo","commands echo"])
+		#help(self.kademlia_node)
+		#self.kademlia_node.printContacts();
+		
+		#cprint("added peers")
+		
+		#threads.callMultipleInThread(commands);
+
 
 	def publishKey(self,key,value):
-		cprint("publishKey, key = %s , value = %s" % (key,value));
+		cprint("[publishKey] key = %s , value = %s" % (key,value));
+		#self.kademlia_node.printContacts();
 		df = self.kademlia_node.publishData(key,[value]);
-		cprint("calling addCallback")
+		#cprint("calling addCallback")
 		df.addCallback(pub_completed);
 		df.addErrback(error)
-		reactor.callLater(2,self.searchKey,self.kademlia_node);
+		#reactor.callLater(2,self.searchKey,self.kademlia_node,);
 	
 	def searchKey(self,key,event):
+		cprint("[searchKey] key = %s" % key);
 		self.event = event
-		cprint("key = %s" % key);
+		#self.kademlia_node.printContacts();
+		
 		#print "%skey = %s%s" % (OKBLUE,key,ENDC);
 		# '''
 		# for i in range(1,2):
@@ -105,8 +119,8 @@ class NODE:
 	def event_completed(self,result):
 		#global global_result 
 		webserver.global_result = result
-		cprint("result in event_completed is %s" % str(result))
-		cprint("calling self.event.set()")
+		#cprint("result in event_completed is %s" % str(result))
+		#cprint("calling self.event.set()")
 		if self.event:
 			self.event.set();
 		else:
@@ -142,13 +156,37 @@ class NODE:
 '''
 #-----------------------------------------------------------
 if __name__ == "__main__":
+	#call(["clear"])
+	#help(app)
 	node_instance = NODE();
+	#node_instance2 = NODE();
+	#print node_instance.PEER
+	#node_instance.entangled.node.printContact()
 	node_instance.registerNode();
-	node_instance.publishKey('{"hcid": "ca4c4244cee2bd8b8a35feddcd0ba36d775d68637b7f0b4d2558728d0752a2a2", "type": "blob"}',["Testnode2 Published: Bagel"])
-	cprint("publish done")
+	#reactor.callLater(0.01,cprint,"CALLLLLLL LATTTEERRRRRRRR");
+	#node_instance.publishKey('{"hcid": "ca4c4244cee2bd8b8a35feddcd0ba36d775d68637b7f0b4d2558728d0752a2a2", "type": "blob"}',["Testnode2 Published: Bagel"])
+	#node_instance.publishKey('{"hkid": "6dedf7e580671bd90bc9d1f735c75a4f3692b697f8979a147e8edd64fab56e85", "type": "commit"}',["Testnode2 Published: Cream Cheese"])
+	#node_instance.publishKey('{"hkid": "0f63f06c4c9802cf3b7628bcbfb9008326e3d37e886cbbd361f7bb8a45782bb4", "namesegment": "testBlob", "type": "tag"}',["Testnode2 Published: Salmon"])
+	#node_instance.publishKey('{"hkid": "0f63f06c4c9802cf3b7628bcbfb9008326e3d37e886cbbd361f7bb8a45782bb4", "type": "key"}',["Testnode2 Published: Onion/Tomato"])
+	#cprint("publish done")
+	#ls(reactor)
+	#cprint(str(reactor.running))
+	#reactor.startRunning();
+	#cprint(str(reactor.running))
+
+	#ls(reactor)
+	#cprint('got to the new part')
 	
+
+
 	webserver.start(getter = node_instance.searchKey,poster = node_instance.publishKey);
+	#cprint("REACTORRRRRRRRRRRRRR PLEASE RUNNNNNN")
+	
 	#reactor.listenTCP(5000,site)
-	print "starting reactor"
-	reactor.run();
-	print "after reactor"
+	#cprint("before Calling Thread")
+	#thread_object = threading.Thread(group=None, target = webserver.start, name=None, args=(), kwargs={"getter" : node_instance.searchKey,"poster" : node_instance.publishKey})
+	
+	#thread_object.start()
+	#cpring("between thread_object and reactor.run")
+	
+	#print "after reactor"
