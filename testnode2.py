@@ -7,6 +7,8 @@ create_network.py 10 127.0.0.1
 python testnode1.py
 python testnode2.py
 '''
+
+import sys
 from flask import g, app,Flask
 from subprocess import call
 import entangled.node
@@ -53,12 +55,13 @@ def cprint(string):
 #----------------------------------------------------------	
 class NODE:
 	event = None;
-	UDP = 4050; 
+	#UDP = 4050; 
 	DATA = None; 
-	PEER = [("localhost",4060),("localhost",4001),("localhost",4002)];
+	#PEER = [("localhost",4060),("localhost",4001),("localhost",4002)];
 	kademlia_node = None;
-	def __init__(self):
-		pass;
+	def __init__(self,KADEMLIA_PORT = 4050,PEER = [("localhost",4060),("localhost",4001),("localhost",4002)]):
+		self.UDP = KADEMLIA_PORT;
+		self.PEER = PEER;
 	def registerNode(self):
 		#cprint("CALLLLLLLLLLLLLLLLLLLLLLLLL")
 		self.kademlia_node = entangled.node.EntangledNode(udpPort=self.UDP, dataStore=self.DATA)
@@ -156,18 +159,55 @@ class NODE:
 '''
 #-----------------------------------------------------------
 if __name__ == "__main__":
+	main()
+
+	#python testnode2.py WEB_PORT KADEMLIA_PORT {[KNOWN_NODE_IP KNOWN_NODE_PORT] or FILE}  
+	if len(sys.argv) < 3:
+		cprint('Usage:\n%s WEB_PORT  KADEMLIA_PORT {[KNOWN_NODE_IP KNOWN_NODE_PORT] or FILE}' % sys.argv[0])
+		sys.exit(1)		 
+	try:
+		int(sys.argv[1])
+	except ValueError:
+		cprint('\nWEB_PORT must be an integer.\n')
+		cprint('Usage:\n%s WEB_PORT  KADEMLIA_PORT {[KNOWN_NODE_IP KNOWN_NODE_PORT] or FILE}' % sys.argv[0])
+		sys.exit(1)
+	try:
+		int(sys.argv[2])
+	except ValueError:
+		cprint('\nKADEMLIA_PORT must be an integer.\n')
+		cprint('Usage:\n%s WEB_PORT  KADEMLIA_PORT {[KNOWN_NODE_IP KNOWN_NODE_PORT] or FILE}' % sys.argv[0])
+		sys.exit(1)
+	if len(sys.argv) == 4:
+		PEER = [(sys.argv[3], int(sys.argv[4]))]
+	elif len(sys.argv) == 3:
+		PEER = []
+		f = open(sys.argv[3],'r')
+		lines = f.readlines()
+		f.close()
+		for line in lines:
+			peer_ip,peer_udp = line.split()
+			PEER.append((peer_ip,int(peer_udp)))
+	else:
+		PEER = None;
+
+
+
+
+
+
+
 	#call(["clear"])
 	#help(app)
-	node_instance = NODE();
+	node_instance = NODE(KADEMLIA_PORT = KADEMLIA_PORT,PEER = PEER);
 	#node_instance2 = NODE();
 	#print node_instance.PEER
 	#node_instance.entangled.node.printContact()
 	node_instance.registerNode();
 	#reactor.callLater(0.01,cprint,"CALLLLLLL LATTTEERRRRRRRR");
-	#node_instance.publishKey('{"hcid": "ca4c4244cee2bd8b8a35feddcd0ba36d775d68637b7f0b4d2558728d0752a2a2", "type": "blob"}',["Testnode2 Published: Bagel"])
-	#node_instance.publishKey('{"hkid": "6dedf7e580671bd90bc9d1f735c75a4f3692b697f8979a147e8edd64fab56e85", "type": "commit"}',["Testnode2 Published: Cream Cheese"])
-	#node_instance.publishKey('{"hkid": "0f63f06c4c9802cf3b7628bcbfb9008326e3d37e886cbbd361f7bb8a45782bb4", "namesegment": "testBlob", "type": "tag"}',["Testnode2 Published: Salmon"])
-	#node_instance.publishKey('{"hkid": "0f63f06c4c9802cf3b7628bcbfb9008326e3d37e886cbbd361f7bb8a45782bb4", "type": "key"}',["Testnode2 Published: Onion/Tomato"])
+	node_instance.publishKey('{"hcid": "ca4c4244cee2bd8b8a35feddcd0ba36d775d68637b7f0b4d2558728d0752a2a2", "type": "blob"}',["Testnode2 Published: Bagel"])
+	node_instance.publishKey('{"hkid": "6dedf7e580671bd90bc9d1f735c75a4f3692b697f8979a147e8edd64fab56e85", "type": "commit"}',["Testnode2 Published: Cream Cheese"])
+	node_instance.publishKey('{"hkid": "0f63f06c4c9802cf3b7628bcbfb9008326e3d37e886cbbd361f7bb8a45782bb4", "namesegment": "testBlob", "type": "tag"}',["Testnode2 Published: Salmon"])
+	node_instance.publishKey('{"hkid": "0f63f06c4c9802cf3b7628bcbfb9008326e3d37e886cbbd361f7bb8a45782bb4", "type": "key"}',["Testnode2 Published: Onion/Tomato"])
 	#cprint("publish done")
 	#ls(reactor)
 	#cprint(str(reactor.running))
