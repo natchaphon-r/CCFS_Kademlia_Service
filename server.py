@@ -27,10 +27,11 @@ def get(key,event):
 	event.set()
 	return "this is a mock, haha you just got mocked"
 	
-def start(getter,poster):
+def start(getter,poster,web_port):
 	global get;
 	global post;
-	get = getter; post = poster;
+	port = web_port;
+	get = getter; post = poster; port = web_port;
 	#app.debug = True
 	#app.run(host= '0.0.0.0',port =5001,debug = False);
 	#cprint("between app.run and reactor.run")
@@ -42,7 +43,7 @@ def start(getter,poster):
 	app.debug = True;
 	resource = WSGIResource(reactor, reactor.getThreadPool(), app)
 	site = Site(resource)
-	reactor.listenTCP(5000, site)
+	reactor.listenTCP(port, site)
 	#cprint("after reactor.listenTCP")
 	reactor.run()
 	# END run in under twisted through wsgi
@@ -84,7 +85,7 @@ def makeKey(user_data):
 def checkValid(values,data):
 	#user_data = web.input();
 	trueblob = (str(values["type"]) ==  "blob") and ((hashlib.sha256(str(data)).hexdigest() == str(values["hcid"])));
-	truecommit = (str(values["type"]) ==  "commit") and (len(values) == 256/4);
+	truecommit = (str(values["type"]) ==  "commit") and (len(values["hkid"]) == 256/4);
 	truetag = (str(values["type"]) ==  "tag") and (len(values["hkid"]) == 256/4) and (len(values["namesegment"]) > 0);
 	truekey = (str(values["type"]) ==  "key") and (len(values["hkid"]) == 256/4);
 	
