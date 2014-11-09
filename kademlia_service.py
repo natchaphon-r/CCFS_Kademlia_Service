@@ -1,127 +1,129 @@
-import json
-import hashlib
-from flask import Flask, request
-import threading
+#!/usr/bin/env python
+import ecdsa
+import entangled.node
+import server as webserver
+import subprocess
+import sys
+import time
+import twisted.internet.defer as defer
 import twisted.internet.reactor as reactor
-from twisted.web.wsgi import WSGIResource
-from twisted.web.server import Site
-global global_result
+
+
+def pub_completed(result):
+    cprint(" Publish Completed : %s" % result)
+
+def sea_completed(result):
+    cprint(" Search Completed : %s" % result)
+
+def error(result):
+    cprint(" error : %s" % result)
 
 def ls(obj):
-	cprint("\n".join([x for x in dir(obj) if x[0] != "_"]))
-def post(key,value):
-	cprint("Mock post: %s : %s" % (key,value))
-	
-def get(key,event):
-	global global_result
-	cprint("in get function event.wait is" + str(event.isSet())) 
-	global_result = "Mock global_result"
-	event.set()
-	if checkValid(key):
-		return "Mock Data"
-	else:
-		return "Error: Invalid Request"
-
-	
-def start(getter,poster,web_port):
-	global get
-	global post
-
-	get = getter
-	post = poster
-	port = web_port
-
-	app.debug = True
-	resource = WSGIResource(reactor, reactor.getThreadPool(), app)
-	site = Site(resource)
-	reactor.listenTCP(port, site)
-
-	reactor.run()
+    cprint("\n".join([x for x in dir(obj) if x[0] != "_"]))
 
 def cprint(string):
-	OKGREEN = '\033[92m'
-	ENDC = '\033[0m'
-	print "%s%s%s" % (OKGREEN,string,ENDC)
+    OKBLUE = '\033[94m'
+    ENDC = '\033[0m'
+    print "%s%s%s" % (OKBLUE, string, ENDC)
 
-def makeKey(user_data):
-	# HCID = Hash Content Identifier
-	# HKID = Hash Key Identifier
-	# Type : Purpose
-	# Blob : Static; contains data
-	# List : Static; exclusive map from next name segment to HID type
-	# Commit : Versioned; exclusive map from HKID to HCID
-	# Tag : Versioned; non-exclusive map from HKID to HID
-	key = list()
-	
-	if user_data["type"] == "blob":
-		key.append(json.dumps({"type":"blob","hcid":user_data["hcid"]}, sort_keys = True))
-		#	key = json.dumps({"type":"blob","hcid":user_data["hcid"]}, sort_keys = True)
-	elif user_data["type"] == "commit":
-		key.append(json.dumps({"type":"blob","hcid":hashlib.sha256(str(user_data)).hexdigest()}, sort_keys = True))
-		key.append(json.dumps({"type":"commit","hkid":user_data["hkid"]}, sort_keys = True))	
-	elif user_data["type"] == "tag":
-		key.append(json.dumps({"type":"blob","hcid":hashlib.sha256(str(user_data)).hexdigest()}, sort_keys = True))
-		key.append(json.dumps({"type":"tag","hkid":user_data["hkid"],"namesegment":user_data["namesegment"]}, sort_keys = True))
-	elif user_data["type"] == "key":
-		key.append(json.dumps({"type":"blob","hcid":hashlib.sha256(str(user_data)).hexdigest()}, sort_keys = True))
-		key.append(json.dumps({"type":"key","hkid":user_data["hkid"]}, sort_keys = True))
-	else: 
-		key = None
-		cprint("Invalid Type")
-	return key
+def errprint(string):
+    OKRED = '\033[31m'
+    ENDC = '\033[0m'
+    print "%s%s%s" % (OKRED, string, ENDC)
 
-def checkValid(values,data):
+class NODE:
+    event = None
+    DATA = None
+    kademlia_node = None
 
-	trueblob = (str(values["type"]) ==  "blob") and ((hashlib.sha256(str(data)).hexdigest() == str(values["hcid"])))
-	truecommit = (str(values["type"]) ==  "commit") and (len(values["hkid"]) == 256/4)
-	truetag = (str(values["type"]) ==  "tag") and (len(values["hkid"]) == 256/4) and (len(values["namesegment"]) > 0)
-	truekey = (str(values["type"]) ==  "key") and (len(values["hkid"]) == 256/4)
-	
-	if (trueblob or truecommit or truetag or truekey):
-		return True
-	else:
-		return False
+    def __init__(self, KADEMLIA_PORT=4050, PEER=[("localhost", 4060), ("localhost", 4001), ("localhost", 4002)]):
+        self.UDP = KADEMLIA_PORT
+        self.PEER = PEER
 
-app = Flask(__name__)
+    def registerNode(self):
+        self.kademlia_node = entangled.node.EntangledNode(udpPort=self.UDP, dataStore=self.DATA)
+        self.kademlia_node.joinNetwork(self.PEER)
 
-@app.route('/',methods=['GET', 'POST'])
-def getorpost():
-	global global_result
-	
-	event = threading.Event()
+    def publishKey(self, key, value):
+        cprint("[publishKey] key = %s , value = %s" % (key, value))
+        df = self.kademlia_node.publishData(key, [value])
+        df.addCallback(pub_completed)
+        df.addErrback(error)
 
-	if request.method == 'POST':
+    def searchKey(self, key, event):
+        cprint("[searchKey] key = %s" % key)
+        self.event = event
 
-		#if type(request.value) is list
-		keys = makeKey(request.values)
-		#key = makeKeyList(request.values)
-		data = request.data
+        found_key = self.kademlia_node.searchForKeywords([key])
+        found_key.addCallback(self.event_completed)
+        found_key.addErrback(error)
+        return found_key
 
-		if checkValid(request.values,request.data):
-			for key in keys:
-				post(key,data)
-				return "key is valid:\n %s" % key
-		else: 
-			return "Invalid Input: \n %s" % key
+    def event_completed(self, result):
+        webserver.global_result = result
 
-	elif request.method == 'GET':
-		global_result = None
-		key = makeKey(request.values)
-		#key = makeKeyList(request.values)
+        if self.event:
+            self.event.set()
+        else:
+            print "event == none"
 
-		thread_object = threading.Thread(group=None, target = get, name=None, args=(key,event), kwargs={})
-		thread_object.start()
+    @defer.inlineCallbacks
+    def resultGenerator(self, key):
 
-		if event.wait():
-			if (len(global_result) > 0):
-				return global_result[0]
-			else:
-				return(str(global_result))
-		else:
-			cprint("Fail... Time out")
+        deferred_thing = (yield self.kademlia_node.searchForKeywords([key]))
+        cprint("thing is %s" % deferred_thing)
+        return
 
-		return "Time-out occured"
+
+def main():
+    if len(sys.argv) < 3:
+        errprint('Usage:\n%s WEB_PORT  KADEMLIA_PORT {[KNOWN_NODE_IP KNOWN_NODE_PORT] or FILE}' % sys.argv[0])
+        sys.exit(1)
+    try:
+        int(sys.argv[1])
+    except ValueError:
+        errprint('\nWEB_PORT must be an integer.\n')
+        errprint('Usage:\n%s WEB_PORT  KADEMLIA_PORT {[KNOWN_NODE_IP KNOWN_NODE_PORT] or FILE}' % sys.argv[0])
+        sys.exit(1)
+    try:
+        int(sys.argv[2])
+    except ValueError:
+        errprint('\nKADEMLIA_PORT must be an integer.\n')
+        errprint('Usage:\n%s WEB_PORT  KADEMLIA_PORT {[KNOWN_NODE_IP KNOWN_NODE_PORT] or FILE}' % sys.argv[0])
+        sys.exit(1)
+
+    if len(sys.argv) == 5:
+        PEER = [(sys.argv[3], int(sys.argv[4]))]
+    elif len(sys.argv) == 4:
+        PEER = []
+        f = open(sys.argv[3], 'r')
+        lines = f.readlines()
+        f.close()
+        for line in lines:
+            peer_ip, peer_udp = line.split()
+            PEER.append((peer_ip, int(peer_udp)))
+    else:
+        PEER = None
+
+    subprocess.Popen(['python', 'examples/create_network.py', '10', '127.0.0.1'],stdout=subprocess.PIPE)
+    #cprint('between subprocesses')
+    time.sleep(5)
+    
+    subprocess.Popen(['python', 'gui.py', '4050', '127.0.0.1', '4000'],stdout=subprocess.PIPE)
+    #subprocess.Popen(['gnome-terminal','--tab'])
+    
+    #cprint('after subprocesses')
+    
+
+    node_instance = NODE(KADEMLIA_PORT=int(sys.argv[2]), PEER=PEER)
+    node_instance.registerNode()
+
+
+    # python gui.py 4000 127.0.0.1 4000 --entangled-0.1
+    # gnome-terminal --tab
+    # create_network.py 10 127.0.0.1
+    webserver.start(getter=node_instance.searchKey, poster=node_instance.publishKey, web_port=int(sys.argv[1]))
+
 
 if __name__ == "__main__":
-	app.debug = True
-	app.run()
+    main()
