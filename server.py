@@ -2,7 +2,6 @@ import ecdsa
 import json
 import hashlib
 import os
-import random
 from flask import Flask, request
 import threading
 import twisted.internet.reactor as reactor
@@ -11,24 +10,11 @@ from twisted.web.server import Site
 global global_result
 
 def deleteBadKey(key):
-	#Delete bad key
-'''
-def verifyKey(sign_key):
-	testData = random.getrandbits(1000)
-	verifyKey
-	signature = sign_key.sign(testData)
+	# Not yet implemented
+	pass
 
-	try:
-		verifyKey.verify(signature,testData)
-		print "Good key"
-		return True
-	except ecdsa.BadSignatureError:
-		print "Bad key"
-		deleteBadKey(sign_key)
-		return False
-'''
-def verifyECDSA(payload,sig,key_object):
-	vk = ecdsa.VerifyingKey.from_string(key_object[1:], curve=ecdsa.NIST521p)
+def verifyECDSA(payload,sig,key_string):
+	vk = ecdsa.VerifyingKey.from_string(key_string[1:], curve=ecdsa.NIST521p)
 	tocheck = hashlib.sha256(payload).digest()
 
 	sig = sig.decode('hex')
@@ -115,53 +101,42 @@ def verifyblob(hkid,data):
 	return hashlib.sha256(str(data)).hexdigest() == data
 
 def verifytagcommit(hkid,data):
-	if len(values["hkid"]) != 256/4
+	if len(values["hkid"]) != (256/4):
 		return False
 
 	payload, sig = data.rsplit(',\n', 1)
 	_, obHKID = payload.rsplit(',\n',1)
 
-	if obHKID != hkid 
+	if obHKID != hkid: 
 		return False
 
 	event = threading.Event()
-	thread_object = threading.Thread(group=None, target = get, name=None, args=(hkid,event), kwargs={})
+	retrievedKey = json.dumps({"type":"blob","hcid":user_value["hcid"]}, sort_keys = True)
+	thread_object = threading.Thread(group=None, target = get, name=None, args=(retrievedKey,event), kwargs={})
 	thread_object.start()
 
 	if event.wait():
 		if (len(global_result) > 0):
-			data = global_result[0]
+			data_string = global_result[0]
 		else:
 			return(str(global_result))
 	else:
 		cprint("Fail... Time out")
-
-	json.dumps({"type":"blob","hcid":user_value["hcid"]
-
-	if verifyECDSA(values[""])
-	
+	return verifyECDSA(payload,sig,data_string)
 
 def checkValid(values,data):
-	# Check and verify key. If fail, 
 	if str(values["type"]) ==  "blob":
 		return verifyblob(values["hcid"],data)
 
-	if (str(values["type"]) ==  "commit") or (str(values["type"]) ==  "tag")
+	if (str(values["type"]) ==  "commit") or (str(values["type"]) ==  "tag"):
 		return verifytagcommit(values["hkid"],data)
 
-	trueblob = verifyblob(values,data);
-	truecommit = (str(values["type"]) ==  "commit") and (len(values["hkid"]) == 256/4) and verifyECDSA(values[""])
-	
-	truetag = (str(values["type"]) ==  "tag") and (len(values["hkid"]) == 256/4) and (len(values["namesegment"]) > 0) and verifyECDSA()
-	
-	truekey = (str(values["type"]) ==  "key") and (len(values["hkid"]) == 256/4) # store a key (private) to retrive the public key sign something 
-	#with public key and unsign with private key
-	
-	if (trueblob or truecommit or truetag or truekey):
-		return True
-	else:
-		return False
+	if (str(values["type"]) ==  "key") and (len(values["hkid"]) == 256/4):
+		return True 
 
+	return False
+
+#################################	
 app = Flask(__name__)
 @app.route('/test',methods=['GET'])
 def testSign():
@@ -191,17 +166,6 @@ def testSign():
 		return("Good Message: " + got[0])
 	except ecdsa.BadSignatureError:
 		return("Bad signature")
-
-
-'''
-try:
-	vk.verify(signature,tocheck)
-	print "good message"
-except ecdsa.BadSignatureError:
-	print "BAD signature"
-
-	return "ran Test"
-'''	
 
 @app.route('/',methods=['GET', 'POST'])
 def getorpost():
