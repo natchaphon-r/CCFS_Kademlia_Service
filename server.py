@@ -189,7 +189,7 @@ def getorpost():
 
 	elif request.method == 'GET':
 		global_result = None
-		key = makeKey(request.values)
+		key = makeKey(request.values,None)
 		#key = makeKeyList(request.values)
 
 		thread_object = threading.Thread(group=None, target = get, name=None, args=(key,event), kwargs={})
