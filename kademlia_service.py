@@ -54,7 +54,7 @@ class NODE:
         cprint("[searchKey] key = %s" % key)
         self.event = event
 
-        found_key = self.kademlia_node.searchForKeywords([key])
+        found_key = self.kademlia_node.searchForKeywords(key)
         found_key.addCallback(self.event_completed)
         found_key.addErrback(error)
         return found_key
