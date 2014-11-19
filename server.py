@@ -78,24 +78,38 @@ def makeKey(user_value, user_data):
 	# Commit : Versioned; exclusive map from HKID to HCID
 	# Tag : Versioned; non-exclusive map from HKID to HID
 	
-	key = list()
+	key_list = list()
+
+	try: 
+		hcid = user_value["hcid"]
+	except KeyError:
+		hcid = hashlib.sha256(str(user_data)).hexdigest()
+	else:
+		pass
+	finally:
+		pass
 	
 	if user_value["type"] == "blob":
-		key.append(json.dumps({"type":"blob","hcid":user_value["hcid"]}, sort_keys = True))
+		cprint("Type Blob")
+		key_list.append(json.dumps({"type":"blob","hcid":hcid}, sort_keys = True))
 		#	key = json.dumps({"type":"blob","hcid":user_data["hcid"]}, sort_keys = True)
 	elif user_value["type"] == "commit": # verify before post/respond data
-		key.append(json.dumps({"type":"blob","hcid":hashlib.sha256(str(user_data)).hexdigest()}, sort_keys = True))
-		key.append(json.dumps({"type":"commit","hkid":user_value["hkid"]}, sort_keys = True))	
+		cprint("Type Commit")
+		key_list.append(json.dumps({"type":"blob","hcid":hcid}, sort_keys = True))
+		key_list.append(json.dumps({"type":"commit","hkid":user_value["hkid"]}, sort_keys = True))	
 	elif user_value["type"] == "tag": # verify before post/respond data
-		key.append(json.dumps({"type":"blob","hcid":hashlib.sha256(str(user_data)).hexdigest()}, sort_keys = True))
-		key.append(json.dumps({"type":"tag","hkid":user_value["hkid"],"namesegment":user_data["namesegment"]}, sort_keys = True))
+		cprint("Type Tag")
+		key_list.append(json.dumps({"type":"blob","hcid":hcid}, sort_keys = True))
+		key_list.append(json.dumps({"type":"tag","hkid":user_value["hkid"],"namesegment":user_data["namesegment"]}, sort_keys = True))
 	elif user_value["type"] == "key":
-		key.append(json.dumps({"type":"blob","hcid":hashlib.sha256(str(user_data)).hexdigest()}, sort_keys = True))
-		key.append(json.dumps({"type":"key","hkid":user_value["hkid"]}, sort_keys = True))
-	else: 
-		key = None
-		cprint("Invalid Type")
-	return key
+		cprint("Type Key")
+		key_list.append(json.dumps({"type":"blob","hcid":hcid}, sort_keys = True))
+		key_list.append(json.dumps({"type":"key","hkid":user_value["hkid"]}, sort_keys = True))
+	else:
+		cprint("Invalid Type") 
+		key_list = None
+		
+	return key_list
 
 def verifyblob(hkid,data):
 	return hashlib.sha256(str(data)).hexdigest() == data
@@ -169,19 +183,19 @@ def testSign():
 
 @app.route('/',methods=['GET', 'POST'])
 def getorpost():
+
 	global global_result
-	
 	event = threading.Event()
 
 	if request.method == 'POST':
 
 		#if type(request.value) is list
-		keys = makeKey(request.values,request.data)
+		key_list = makeKey(request.values,request.data)
 		#key = makeKeyList(request.values)
 		data = request.data
 
 		if checkValid(request.values,request.data):
-			for key in keys:
+			for key in key_list:
 				post(key,data)
 				return "key is valid:\n %s" % key
 		else: 
