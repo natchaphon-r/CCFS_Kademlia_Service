@@ -36,12 +36,12 @@ def ls(obj):
 def post(key,value):
 	cprint("Mock post: %s : %s" % (key,value))
 	
-def get(key,event):
+def get(key_list,event):
 	global global_result
 	cprint("in get function event.wait is" + str(event.isSet())) 
 	global_result = "Mock global_result"
 	event.set()
-	if checkValid(key,None):
+	if checkValid(key_list,None):
 		return "Mock Data"
 	else:
 		return "Error: Invalid Request"
@@ -197,16 +197,16 @@ def getorpost():
 		if checkValid(request.values,request.data):
 			for key in key_list:
 				post(key,data)
-				return "key is valid:\n %s" % key
+			return "key is valid:\n %s" % key_list
 		else: 
-			return "Invalid Input: \n %s" % key
+			return "Invalid Input: \n %s" % key_list
 
 	elif request.method == 'GET':
 		global_result = None
-		key = makeKey(request.values,None)
+		key_list = makeKey(request.values,None)
 		#key = makeKeyList(request.values)
 
-		thread_object = threading.Thread(group=None, target = get, name=None, args=(key,event), kwargs={})
+		thread_object = threading.Thread(group=None, target = get, name=None, args=(key_list,event), kwargs={})
 		thread_object.start()
 
 		if event.wait():
