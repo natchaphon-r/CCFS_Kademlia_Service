@@ -1,226 +1,160 @@
-import ecdsa
 import json
 import hashlib
-import os
-from flask import Flask, request
+from flask import g , app, Flask, request
+import time
 import threading
 import twisted.internet.reactor as reactor
-from twisted.web.wsgi import WSGIResource
-from twisted.web.server import Site
-global global_result
-
-def deleteBadKey(key):
-	# Not yet implemented
-	pass
-
-def verifyECDSA(payload,sig,key_string):
-	vk = ecdsa.VerifyingKey.from_string(key_string[1:], curve=ecdsa.NIST521p)
-	tocheck = hashlib.sha256(payload).digest()
-
-	sig = sig.decode('hex')
-	assert sig[0] == '\x04'
-	sig = sig[1:]
-
-	try:
-	    vk.verify(sig,payload, hashfunc=hashlib.sha256) #last element , extract everything except from the last element
-	    print "Good data"
-	    return True
-	except ecdsa.BadSignatureError:
-	    print "Bad data"
-	    return False
-
+import traceback
+# #-------------------------------------------------------------------------------
+# def f(depth = 0):
+# 	print depth, traceback.print_stack();
+# 	if depth < 2:
+# 		f(depth+1)
+global global_result;
 
 def ls(obj):
-	cprint("\n".join([x for x in dir(obj) if x[0] != "_"]))
-
+	cprint("\n".join([x for x in dir(obj) if x[0] != "_"]));
 def post(key,value):
-	cprint("Mock post: %s : %s" % (key,value))
+	#event.set()
+	cprint("Mock post: %s : %s" % (key,value));
 	
-def get(key_list,event):
-	global global_result
+def get(key,event):
+	global global_result;
 	cprint("in get function event.wait is" + str(event.isSet())) 
-	global_result = "Mock global_result"
+	cprint("Mock get: %s" % (key));
+	global_result = "This is a mock global_result"
+	cprint("in get %s " % global_result)
 	event.set()
-	if checkValid(key_list,None):
-		return "Mock Data"
-	else:
-		return "Error: Invalid Request"
-
+	return "this is a mock, haha you just got mocked"
 	
-def start(getter,poster,web_port):
-	global get
-	global post
+def start(getter,poster):
+	global get;
+	global post;
+	get = getter; post = poster;
+	#app.debug = True
+	#app.run(host= '0.0.0.0',port =5001,debug = False);
+	#cprint("between app.run and reactor.run")
 
-	get = getter
-	post = poster
-	port = web_port
+	# BEGIN run in under twisted through wsgi
+	from twisted.web.wsgi import WSGIResource
+	from twisted.web.server import Site
 
-	app.debug = True
+	app.debug = True;
 	resource = WSGIResource(reactor, reactor.getThreadPool(), app)
 	site = Site(resource)
-	reactor.listenTCP(port, site)
-
+	reactor.listenTCP(5000, site)
+	#cprint("after reactor.listenTCP")
 	reactor.run()
+	# END run in under twisted through wsgi
+
+
+
+
+	reactor.run();
 
 def cprint(string):
 	OKGREEN = '\033[92m'
 	ENDC = '\033[0m'
-	print "%s%s%s" % (OKGREEN,string,ENDC)
+	print "%s%s%s" % (OKGREEN,string,ENDC);
 
-def makeKey(user_value, user_data):
-	#JSON Object as a key
 
+def makeKey(user_data):
 	# HCID = Hash Content Identifier
 	# HKID = Hash Key Identifier
+	#print "TYPPEEEEEE = %s" % user_data["type"]
 	# Type : Purpose
 	# Blob : Static; contains data
 	# List : Static; exclusive map from next name segment to HID type
 	# Commit : Versioned; exclusive map from HKID to HCID
 	# Tag : Versioned; non-exclusive map from HKID to HID
-	
-	key_list = list()
 
-	try: 
-		hcid = user_value["hcid"]
-	except KeyError:
-		hcid = hashlib.sha256(str(user_data)).hexdigest()
-	else:
-		pass
-	finally:
-		pass
-	
-	if user_value["type"] == "blob":
-		cprint("Type Blob")
-		key_list.append(json.dumps({"type":"blob","hcid":hcid}, sort_keys = True))
-		#	key = json.dumps({"type":"blob","hcid":user_data["hcid"]}, sort_keys = True)
-	elif user_value["type"] == "commit": # verify before post/respond data
-		cprint("Type Commit")
-		key_list.append(json.dumps({"type":"blob","hcid":hcid}, sort_keys = True))
-		key_list.append(json.dumps({"type":"commit","hkid":user_value["hkid"]}, sort_keys = True))	
-	elif user_value["type"] == "tag": # verify before post/respond data
-		cprint("Type Tag")
-		key_list.append(json.dumps({"type":"blob","hcid":hcid}, sort_keys = True))
-		key_list.append(json.dumps({"type":"tag","hkid":user_value["hkid"],"namesegment":user_data["namesegment"]}, sort_keys = True))
-	elif user_value["type"] == "key":
-		cprint("Type Key")
-		key_list.append(json.dumps({"type":"blob","hcid":hcid}, sort_keys = True))
-		key_list.append(json.dumps({"type":"key","hkid":user_value["hkid"]}, sort_keys = True))
-	else:
-		cprint("Invalid Type") 
-		key_list = None
-		
-	return key_list
-
-def verifyblob(hkid,data):
-	return hashlib.sha256(str(data)).hexdigest() == data
-
-def verifytagcommit(hkid,data):
-	if len(values["hkid"]) != (256/4):
-		return False
-
-	payload, sig = data.rsplit(',\n', 1)
-	_, obHKID = payload.rsplit(',\n',1)
-
-	if obHKID != hkid: 
-		return False
-
-	event = threading.Event()
-	retrievedKey = json.dumps({"type":"blob","hcid":user_value["hcid"]}, sort_keys = True)
-	thread_object = threading.Thread(group=None, target = get, name=None, args=(retrievedKey,event), kwargs={})
-	thread_object.start()
-
-	if event.wait():
-		if (len(global_result) > 0):
-			data_string = global_result[0]
-		else:
-			return(str(global_result))
-	else:
-		cprint("Fail... Time out")
-	return verifyECDSA(payload,sig,data_string)
+	if user_data["type"] == "blob":
+		key = json.dumps({"type":"blob","hcid":user_data["hcid"]}, sort_keys = True)
+	elif user_data["type"] == "commit":
+		key = json.dumps({"type":"commit","hkid":user_data["hkid"]}, sort_keys = True)	
+	elif user_data["type"] == "tag":
+		key = json.dumps({"type":"tag","hkid":user_data["hkid"],"namesegment":user_data["namesegment"]}, sort_keys = True)
+	elif user_data["type"] == "key":
+		key = json.dumps({"type":"key","hkid":user_data["hkid"]}, sort_keys = True)
+	else: 
+		key = None
+		cprint("Invalid Type");	
+	return key
 
 def checkValid(values,data):
-	if str(values["type"]) ==  "blob":
-		return verifyblob(values["hcid"],data)
-
-	if (str(values["type"]) ==  "commit") or (str(values["type"]) ==  "tag"):
-		return verifytagcommit(values["hkid"],data)
-
-	if (str(values["type"]) ==  "key") and (len(values["hkid"]) == 256/4):
-		return True 
-
-	return False
-
-#################################	
-app = Flask(__name__)
-@app.route('/test',methods=['GET'])
-def testSign():
-	MSG = "Hello World"
+	#user_data = web.input();
+	trueblob = (str(values["type"]) ==  "blob") and ((hashlib.sha256(str(data)).hexdigest() == str(values["hcid"])));
+	truecommit = (str(values["type"]) ==  "commit") and (len(values["hkid"]) == 256/4);
+	truetag = (str(values["type"]) ==  "tag") and (len(values["hkid"]) == 256/4) and (len(values["namesegment"]) > 0);
+	truekey = (str(values["type"]) ==  "key") and (len(values["hkid"]) == 256/4);
 	
+	#cprint(web.data());
+	
+	if (trueblob or truecommit or truetag or truekey):
+		return True;
+	else:
+		return False;
 
-	#Create signing key
-	sk = ecdsa.SigningKey.generate(ecdsa.NIST256p)
-	#Create verifying key
-	vk = sk.get_verifying_key()
-	topost = MSG+","+vk.to_pem()+","+sk.sign(MSG).encode("hex")
-	# post("storage_key",topost)
-	# #################################################
-	# event = threading.Event()
-	# thread_object = threading.Thread(group=None, target = get, name=None, args=("storage_key",event), kwargs={})
-	# thread_object.start()
-
-	# #if event.wait(2):
-	# return "TestSign" + global_result
-	# return "Time-out occured"
-	# #################################################
-	#got = topost.split(',')
-	got = topost.split(',')
-	msg_tocheck = got[0]
-	try:
-		vk.verify(got[2].decode("hex"),msg_tocheck)
-		return("Good Message: " + got[0])
-	except ecdsa.BadSignatureError:
-		return("Bad signature")
+app = Flask(__name__)
 
 @app.route('/',methods=['GET', 'POST'])
 def getorpost():
+	global global_result;
+	#cprint("WE ARE HERE!")
 
-	global global_result
 	event = threading.Event()
-
+	cprint(str(request.method))
+	#help(event)
+	#event = None
 	if request.method == 'POST':
+		#ls(request)
+		print "######################################################################"
+		cprint("[POST Method] in here")
+		cprint("[POST Method] request.value[0] is %s" % str(request.values))
+		key = makeKey(request.values);
+		cprint("[POST Method] : key = %s" % str(key));
+		data = request.data; # validate data with hashes
+		cprint("[POST Method] : data = %s" % str(data));
 
-		#if type(request.value) is list
-		key_list = makeKey(request.values,request.data)
-		#key = makeKeyList(request.values)
-		data = request.data
+		#return checkValid(data)
 
 		if checkValid(request.values,request.data):
-			for key in key_list:
-				post(key,data)
-			return "key is valid:\n %s" % key_list
+			post(key,data);
+			return "key is valid:\n %s" % key
 		else: 
-			return "Invalid Input: \n %s" % key_list
-
+			return "Invalid Input: \n %s" % key;
 	elif request.method == 'GET':
-		global_result = None
-		key_list = makeKey(request.values,None)
-		#key = makeKeyList(request.values)
-
-		thread_object = threading.Thread(group=None, target = get, name=None, args=(key_list,event), kwargs={})
+		#global global_result
+		global_result = None;
+		key = makeKey(request.values);
+		#cprint("PASS MAKEKEY %s" % str(key))
+		#help(reactor)
+		thread_object = threading.Thread(group=None, target = get, name=None, args=(key,event), kwargs={})
 		thread_object.start()
-
+		#data = reactor.callInThread(get,[key,event],{})#reactCaget(key,event)
+		#data = get(key,event)
+		#cprint("The data is %s" % str(data))
+		#time.sleep(1);
+		#print "printing from server %s" % data.callback()
+		#f()
+		#help(event)
+		#cprint("got to wait")
+		#cprint("The value of event.wait is " + str(event.isSet()))
+		#event.set()
 		if event.wait():
+			#cprint("Result returned")
+			cprint("global result = %s" % global_result)	
+			cprint(str(type(global_result)))
 			if (len(global_result) > 0):
-
-				return global_result[0]
+				return global_result[0];
 			else:
-				return(str(global_result))
-
+				return(str(global_result));	
 		else:
 			cprint("Fail... Time out")
+		#cprint("got through wait")
 
 		return "Time-out occured"
 
 if __name__ == "__main__":
 	app.debug = True
-	app.run(host='0.0.0.0')
+	app.run();
